@@ -1,12 +1,20 @@
 package br.senai.sp.cotia.jogodavelhaapp.fragment;
 
+import android.content.DialogInterface;
 import android.graphics.Color;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.fragment.NavHostFragment;
 
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -17,6 +25,7 @@ import java.util.Random;
 
 import br.senai.sp.cotia.jogodavelhaapp.R;
 import br.senai.sp.cotia.jogodavelhaapp.databinding.FragmentJogoBinding;
+import br.senai.sp.cotia.jogodavelhaapp.util.PrefsUtil;
 
 
 public class FragmentJogo extends Fragment {
@@ -33,10 +42,43 @@ public class FragmentJogo extends Fragment {
     private Random random;
     //variável para contar o número de jogadas
     private int numJogadas = 0;
+    //vairiáveis para o placar
+    private int placarJog1 = 0, placarJog2 = 0;
+    //variável para perguntar se realmente deseja resetar
+    private  AlertDialog alerta;
+    //variável para o placar da velha
+    private int placarVelha = 0;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
+
+        //cria uma caixa de alerta
+        AlertDialog.Builder alert = new AlertDialog.Builder(this.getActivity());
+        alert.setTitle("Não se vá");
+        alert.setMessage("Tem certeza que deseja resetar??");
+        alert.setPositiveButton("Sim", new DialogInterface.OnClickListener() {
+
+            @Override
+            public void onClick(DialogInterface arg0, int arg1) {
+                placarJog1 = 0;
+                placarJog2 = 0;
+                placarVelha = 0;
+                resetar();
+                atualizarPlacar();
+            }
+        });
+        alert.setNegativeButton("Não", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface arg0, int arg1)  {
+                arg0.cancel();
+            }
+        });
+
+        alerta = alert.create();
+
+       //habilita o menu neste fragment
+        setHasOptionsMenu(true);
         //instancia o binding
         binding = FragmentJogoBinding.inflate(inflater, container, false);
 
@@ -71,8 +113,12 @@ public class FragmentJogo extends Fragment {
 
 
         //define os simbolos dos jogadores
-        simbJog1 = "X";
-        simbJog2 = "O";
+        simbJog1 = PrefsUtil.getSimboloJog1(getContext());
+        simbJog2 = PrefsUtil.getSimboloJog2(getContext());
+
+        //altera o símbolo do jogador no placar
+        binding.tvJogador1.setText(getResources().getString(R.string.jogador1, simbJog1));
+        binding.tvJogador2.setText(getResources().getString(R.string.jogador2, simbJog2));
 
         //sorteia quem inicia o jogo
         sorteia();
@@ -115,6 +161,7 @@ public class FragmentJogo extends Fragment {
             botao.setText("");
             botao.setClickable(true);
         }
+
         //sorteia quem irá iniciar o próximo jogo
         sorteia();
         //atualiza a vez no placar
@@ -122,6 +169,7 @@ public class FragmentJogo extends Fragment {
         //zerar o número dde jogadas
         numJogadas = 0;
     }
+
 
     private boolean venceu(){
         //verifica se venceu nas linhas
@@ -176,6 +224,42 @@ public class FragmentJogo extends Fragment {
         */
     }
 
+    private void atualizarPlacar(){
+        binding.placar.setText(placarJog1+"");
+        binding.placar2.setText(placarJog2+"");
+        binding.placa3.setText(placarVelha+"");
+
+
+    }
+
+    @Override
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        //método para chamar o menu
+        inflater.inflate(R.menu.menu_main, menu);
+        super.onCreateOptionsMenu(menu, inflater);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        //verifica qual o botão foi clicado no menu
+        switch (item.getItemId()){
+            //caso tenha clicado no resetar
+            case R.id.menu_resetar:
+                alerta.show();
+                break;
+
+            //caso tenha clicado no referências
+            case R.id.menu_prefs:
+                NavHostFragment.findNavController( FragmentJogo.this).navigate(R.id.action_fragmentJogo_to_prefFragment);
+                break;
+
+            case R.id.menu_inicio:
+                NavHostFragment.findNavController(FragmentJogo.this).navigate(R.id.action_fragmentJogo_to_fragmentInicio);
+                break;
+        }
+
+        return true;
+    }
 
     private View.OnClickListener listenerBotoes = btPress -> {
         //incrementa as jogadas
@@ -202,11 +286,25 @@ public class FragmentJogo extends Fragment {
         if (numJogadas >= 5 && venceu()){
             //exibe um toast informando que o jogador venceu
             Toast.makeText(getContext(), R.string.venceu, Toast.LENGTH_LONG).show();
+            //verificar quem venveu e atualiza o placar
+            if (simbolo.equals(simbJog1)){
+                placarJog1++;
+            }else if (simbolo.equals(simbJog2)){
+                placarJog2++;
+            }else{
+                placarVelha++;
+            }
+            //atualiza o placar
+            atualizarPlacar();
+
             //resetar o tabuleiro
             resetar();
+
         }else if (numJogadas == 9) {
-            //exibe um Toast informando que o jogador venceu
+            //exibe um Toast informando que deu velha
             Toast.makeText(getContext(), R.string.deuvelha, Toast.LENGTH_LONG).show();
+            placarVelha++;
+            atualizarPlacar();
             //resetar o tabuleiro
             resetar();
         }else{
@@ -216,5 +314,18 @@ public class FragmentJogo extends Fragment {
             //atualiza a vez
             atualizaVez();
         }
+
     };
+    @Override
+    public void onStart(){
+        super.onStart();
+        // para "sumir" com a toolbar
+        //pegar uma referência do tipo AppCompactActivity
+        AppCompatActivity minhaActivity = (AppCompatActivity) getActivity();
+        //oculta a toolbar
+        minhaActivity.getSupportActionBar().show();
+        //retira o botão de voltar da action bar
+        minhaActivity.getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+    }
+
 }
